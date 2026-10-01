@@ -13,14 +13,12 @@ const wss = new WebSocketServer({ server });
 const rooms = new Map();
 const sockets = new Map();
 
-// Carpeta donde se guardarán los archivos
 const uploadsDir = path.join(process.cwd(), 'uploads');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configuración para recibir archivos
 const upload = multer({
   dest: uploadsDir,
   limits: {
@@ -36,7 +34,6 @@ app.get('/health', (_, res) => {
   res.json({ ok: true });
 });
 
-// Recibir un archivo
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({
@@ -90,6 +87,7 @@ wss.on('connection', ws => {
       }
 
       rooms.set(id, ws);
+
       sockets.set(ws, {
         role: 'host',
         room: id
