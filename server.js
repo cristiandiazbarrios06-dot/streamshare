@@ -27,7 +27,6 @@ const upload = multer({
 });
 
 app.use(express.static('public'));
-
 app.use('/uploads', express.static(uploadsDir));
 
 app.get('/health', (_, res) => {
@@ -35,6 +34,7 @@ app.get('/health', (_, res) => {
 });
 
 app.post('/upload', upload.single('file'), (req, res) => {
+
   if (!req.file) {
     return res.status(400).json({
       ok: false,
@@ -42,10 +42,13 @@ app.post('/upload', upload.single('file'), (req, res) => {
     });
   }
 
-  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const protocol =
+    req.headers['x-forwarded-proto'] || 'http';
+
   const host = req.get('host');
 
-  const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+  const fileUrl =
+    `${protocol}://${host}/uploads/${req.file.filename}`;
 
   res.json({
     ok: true,
@@ -56,19 +59,25 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 function send(ws, obj) {
+
   if (ws?.readyState === 1) {
     ws.send(JSON.stringify(obj));
   }
 }
 
 function roomId() {
-  return crypto.randomBytes(5).toString('base64url');
+
+  return crypto
+    .randomBytes(5)
+    .toString('base64url');
 }
 
 wss.on('connection', ws => {
+
   sockets.set(ws, {});
 
   ws.on('message', raw => {
+
     let m;
 
     try {
@@ -77,9 +86,11 @@ wss.on('connection', ws => {
       return;
     }
 
-    const meta = sockets.get(ws) || {};
+    const meta =
+      sockets.get(ws) || {};
 
     if (m.type === 'host') {
+
       let id = roomId();
 
       while (rooms.has(id)) {
@@ -102,16 +113,23 @@ wss.on('connection', ws => {
     }
 
     if (m.type === 'join') {
-      const host = rooms.get(m.room);
+
+      const host =
+        rooms.get(m.room);
 
       if (!host) {
+
         return send(ws, {
           type: 'error',
-          message: 'Sala no encontrada o ya cerrada.'
+          message:
+            'Sala no encontrada o ya cerrada.'
         });
       }
 
-      const id = crypto.randomBytes(8).toString('hex');
+      const id =
+        crypto
+          .randomBytes(8)
+          .toString('hex');
 
       sockets.set(ws, {
         role: 'viewer',
@@ -136,34 +154,77 @@ wss.on('connection', ws => {
     const room = meta.room;
     const host = rooms.get(room);
 
-    if (m.type === 'offer' && meta.role === 'host') {
+    // ENVIAR INFORMACIÓN DEL ARCHIVO A LOS USUARIOS DE LA SALA
+    if (
+      m.type === 'file' &&
+      meta.role === 'host'
+    ) {
+
       for (const [sock, info] of sockets) {
+
+        if (
+          info.role === 'viewer' &&
+          info.room === room
+        ) {
+
+          send(sock, {
+            type: 'file',
+            url: m.url,
+            filename: m.filename,
+            size: m.size
+          });
+        }
+      }
+
+      return;
+    }
+
+    if (
+      m.type === 'offer' &&
+      meta.role === 'host'
+    ) {
+
+      for (const [sock, info] of sockets) {
+
         if (
           info.role === 'viewer' &&
           info.room === room &&
           info.id === m.to
         ) {
+
           send(sock, {
             ...m,
             from: 'host'
           });
         }
       }
-    } else if (
-      (m.type === 'answer' || m.type === 'ice') &&
+    }
+
+    else if (
+      (m.type === 'answer' ||
+       m.type === 'ice') &&
       meta.role === 'viewer'
     ) {
+
       send(host, {
         ...m,
         from: meta.id
       });
-    } else if (m.type === 'ice' && meta.role === 'host') {
+    }
+
+    else if (
+      m.type === 'ice' &&
+      meta.role === 'host'
+    ) {
+
       for (const [sock, info] of sockets) {
+
         if (
           info.role === 'viewer' &&
           info.room === room &&
           info.id === m.to
         ) {
+
           send(sock, {
             ...m,
             from: 'host'
@@ -174,25 +235,37 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
-    const meta = sockets.get(ws);
+
+    const meta =
+      sockets.get(ws);
 
     if (meta?.role === 'host') {
-      if (rooms.get(meta.room) === ws) {
+
+      if (
+        rooms.get(meta.room) === ws
+      ) {
         rooms.delete(meta.room);
       }
 
       for (const [sock, info] of sockets) {
+
         if (
           info.role === 'viewer' &&
           info.room === meta.room
         ) {
+
           send(sock, {
             type: 'ended'
           });
         }
       }
-    } else if (meta?.role === 'viewer') {
-      const host = rooms.get(meta.room);
+
+    } else if (
+      meta?.role === 'viewer'
+    ) {
+
+      const host =
+        rooms.get(meta.room);
 
       send(host, {
         type: 'viewer-left',
@@ -204,8 +277,12 @@ wss.on('connection', ws => {
   });
 });
 
-const port = process.env.PORT || 3000;
+const port =
+  process.env.PORT || 3000;
 
 server.listen(port, () => {
-  console.log(`StreamShare server listening on :${port}`);
+
+  console.log(
+    `StreamShare server listening on :${port}`
+  );
 });
