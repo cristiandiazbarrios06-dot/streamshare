@@ -45,7 +45,8 @@ app.post('/upload', upload.single('file'), (req, res) => {
   const protocol =
     req.headers['x-forwarded-proto'] || 'http';
 
-  const host = req.get('host');
+  const host =
+    req.get('host');
 
   const fileUrl =
     `${protocol}://${host}/uploads/${req.file.filename}`;
@@ -70,6 +71,33 @@ function roomId() {
   return crypto
     .randomBytes(5)
     .toString('base64url');
+}
+
+function enviarUsuarios(room) {
+
+  const usuarios = [];
+
+  for (const [sock, info] of sockets) {
+
+    if (
+      info.room === room &&
+      (info.role === 'host' ||
+       info.role === 'viewer')
+    ) {
+
+      usuarios.push({
+        id: info.id || 'host',
+        name: info.name || 'Usuario'
+      });
+    }
+  }
+
+  const host = rooms.get(room);
+
+  send(host, {
+    type: 'users',
+    users: usuarios
+  });
 }
 
 wss.on('connection', ws => {
@@ -97,17 +125,25 @@ wss.on('connection', ws => {
         id = roomId();
       }
 
+      const nombre =
+        String(m.name || 'Cristian').trim() ||
+        'Cristian';
+
       rooms.set(id, ws);
 
       sockets.set(ws, {
         role: 'host',
-        room: id
+        room: id,
+        id: 'host',
+        name: nombre
       });
 
       send(ws, {
         type: 'room',
         room: id
       });
+
+      enviarUsuarios(id);
 
       return;
     }
@@ -131,10 +167,15 @@ wss.on('connection', ws => {
           .randomBytes(8)
           .toString('hex');
 
+      const nombre =
+        String(m.name || 'Usuario').trim() ||
+        'Usuario';
+
       sockets.set(ws, {
         role: 'viewer',
         room: m.room,
-        id
+        id,
+        name: nombre
       });
 
       send(ws, {
@@ -145,8 +186,11 @@ wss.on('connection', ws => {
 
       send(host, {
         type: 'viewer-joined',
-        id
+        id,
+        name: nombre
       });
+
+      enviarUsuarios(m.room);
 
       return;
     }
@@ -154,7 +198,6 @@ wss.on('connection', ws => {
     const room = meta.room;
     const host = rooms.get(room);
 
-    // ENVIAR INFORMACIÓN DEL ARCHIVO A LOS USUARIOS DE LA SALA
     if (
       m.type === 'file' &&
       meta.role === 'host'
@@ -269,8 +312,11 @@ wss.on('connection', ws => {
 
       send(host, {
         type: 'viewer-left',
-        id: meta.id
+        id: meta.id,
+        name: meta.name
       });
+
+      enviarUsuarios(meta.room);
     }
 
     sockets.delete(ws);
